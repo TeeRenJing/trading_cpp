@@ -21,6 +21,7 @@ inline auto createAndStartThread(int core_id, const std::string &thread_name, T 
 
     auto thread_body = [&]
     {
+        // Affinity is optional; a negative core_id means "leave scheduling to the OS".
         if (core_id >= 0 && !setThreadCore(core_id))
         {
             std::cerr << "Failed to set thread affinity for thread: " << thread_name << " " << pthread_self() << " to core " << core_id << std::endl;
@@ -34,6 +35,7 @@ inline auto createAndStartThread(int core_id, const std::string &thread_name, T 
 
     auto t = new std::thread(thread_body);
 
+    // Spin until the child thread reports either successful startup or immediate failure.
     while (!running && !failed)
     {
         using namespace std::literals::chrono_literals;

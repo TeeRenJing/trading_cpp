@@ -25,6 +25,7 @@ namespace Common
         time_str->assign(std::ctime(&time));
         if (!time_str->empty())
         {
+            // ctime() appends a trailing newline, which is awkward inside structured log lines.
             time_str->at(time_str->size() - 1) = '\0'; // Remove the newline character added by ctime
         }
         return *time_str;

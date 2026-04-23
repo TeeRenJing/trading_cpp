@@ -14,6 +14,7 @@ namespace Common
     private:
         struct ObjectBlock
         {
+            // Storage and allocation metadata are kept adjacent so pointer math can recover the block.
             T object_;
             bool is_free_ = true;
         };
@@ -23,6 +24,7 @@ namespace Common
         auto updateNextFreeIndex() noexcept
         {
             const auto initial_free_index = next_free_index_;
+            // Probe circularly until we find another free slot.
             while (!store_[next_free_index_].is_free_)
             {
                 next_free_index_++;
@@ -53,6 +55,7 @@ namespace Common
         {
             auto obj_block = &(store_[next_free_index_]);
             ASSERT(obj_block->is_free_, "MemPool: No free objects available for allocation");
+            // Placement-new constructs T directly inside the preallocated slot.
             T *ret = &(obj_block->object_);
             ret = new (ret) T(std::forward<Args>(args)...);
             obj_block->is_free_ = false;
@@ -64,6 +67,8 @@ namespace Common
 
         auto deallocate(const T *elem) noexcept
         {
+            // The pool expects elem to point at an object previously returned by allocate().
+            // This index recovery depends on object_ remaining the first field in ObjectBlock.
             const auto elem_index = (reinterpret_cast<const ObjectBlock *>(elem) - &(store_[0]));
             ASSERT(elem_index >= 0 && static_cast<size_t>(elem_index) < store_.size(), "MemPool: Attempt to deallocate invalid pointer");
             ASSERT(!store_[elem_index].is_free_, "MemPool: Attempt to deallocate already free object");

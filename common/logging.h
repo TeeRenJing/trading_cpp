@@ -55,7 +55,8 @@ namespace Common
 
         ~Logger()
         {
-            while (!log_queue_.size())
+            // Wait for the background thread to drain any queued log records before shutdown.
+            while (log_queue_.size())
             {
                 using namespace std::literals::chrono_literals;
                 std::this_thread::sleep_for(1ms);
@@ -76,9 +77,8 @@ namespace Common
 
         auto pushValue(const LogElement &log_element) noexcept -> void
         {
-            auto next_to_write = log_queue_.getNextToWriteTo();
-            *next_to_write = log_element;
-            log_queue_.updateNextWriteIndex();
+            // Producers publish fully-formed log elements with a single SPSC queue operation.
+            ASSERT(log_queue_.tryPush(log_element), "Logger: Log queue is full");
         }
 
         auto pushValue(const char value) noexcept -> void
@@ -133,9 +133,10 @@ namespace Common
         }
         auto flushQueue() noexcept -> void
         {
-            while (is_running_)
+            while (is_running_ || log_queue_.size())
             {
-                for (auto next_to_read = log_queue_.getNextToRead(); next_to_read != nullptr; log_queue_.updateReadIndex(), next_to_read = log_queue_.getNextToRead())
+                // Drain all currently available elements in one batch, then yield briefly.
+                for (auto next_to_read = log_queue_.front(); next_to_read != nullptr; log_queue_.pop(), next_to_read = log_queue_.front())
                 {
                     const auto &log_element = *next_to_read;
                     switch (log_element.type_)
@@ -180,6 +181,7 @@ namespace Common
         template <typename T, typename... Args>
         auto log(const char *s, const T &value, Args... args) noexcept -> void
         {
+            // '%' is this logger's placeholder marker; '%%' escapes a literal percent sign.
             while (*s != '\0')
             {
                 if (*s == '%')
