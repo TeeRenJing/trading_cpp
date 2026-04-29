@@ -9,8 +9,6 @@ using namespace Common;
 
 namespace Exchange
 {
-#pragma pack(push, 1)
-    // This response is encoded as a compact wire/message payload.
     enum class ClientResponseType : uint8_t
     {
         INVALID = 0,
@@ -38,10 +36,11 @@ namespace Exchange
         return "UNKNOWN";
     }
 
+#pragma pack(push, 1)
+
     struct MEClientResponse
     {
         ClientResponseType type_ = ClientResponseType::INVALID;
-        // Defaults make it easy to spot fields the producer forgot to populate.
         ClientId client_id_ = ClientId_INVALID;
         TickerId ticker_id_ = TickerId_INVALID;
         OrderId client_order_id_ = OrderId_INVALID;
@@ -70,8 +69,24 @@ namespace Exchange
         }
     };
 
+    struct OMClientResponse
+    {
+        size_t seq_num_ = 0;
+        MEClientResponse me_client_response_;
+
+        auto toString() const
+        {
+            std::stringstream ss;
+            ss << "OMClientResponse"
+               << " ["
+               << "seq:" << seq_num_
+               << " " << me_client_response_.toString()
+               << "]";
+            return ss.str();
+        }
+    };
+
 #pragma pack(pop)
 
-    // SPSC queue used to send matching-engine acknowledgements back to clients.
     typedef LFQueue<MEClientResponse> ClientResponseLFQueue;
 }

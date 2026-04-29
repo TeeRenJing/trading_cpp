@@ -9,8 +9,6 @@ using namespace Common;
 
 namespace Exchange
 {
-#pragma pack(push, 1)
-    // This request is intended to cross a queue or wire without padding bytes.
     enum class ClientRequestType : uint8_t
     {
         INVALID = 0,
@@ -32,11 +30,12 @@ namespace Exchange
         return "UNKNOWN";
     }
 
+#pragma pack(push, 1)
+
     struct MEClientRequest
     {
         ClientRequestType type_ = ClientRequestType::INVALID;
 
-        // Defaults keep partially initialized requests obviously invalid.
         ClientId client_id_ = ClientId_INVALID;
         TickerId ticker_id_ = TickerId_INVALID;
         OrderId order_id_ = OrderId_INVALID;
@@ -61,8 +60,24 @@ namespace Exchange
         }
     };
 
+    struct OMClientRequest
+    {
+        size_t seq_num_ = 0;
+        MEClientRequest me_client_request_;
+
+        auto toString() const
+        {
+            std::stringstream ss;
+            ss << "OMClientRequest"
+               << " ["
+               << "seq:" << seq_num_
+               << " " << me_client_request_.toString()
+               << "]";
+            return ss.str();
+        }
+    };
+
 #pragma pack(pop)
 
-    // SPSC queue used between the client-facing ingress path and the matching engine.
     typedef LFQueue<MEClientRequest> ClientRequestLFQueue;
 }
